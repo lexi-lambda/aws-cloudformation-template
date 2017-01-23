@@ -1,0 +1,31 @@
+language: c
+
+env:
+  global:
+    - RACKET_DIR: ~/racket
+    - GH_REF: github.com/lexi-lambda/aws-cloudformation-template.git
+    - secure: rrFQLyt8ZmwlnhymmP0v6gF/GMhbP4XDhs08mq+AmfId8ONeh3P97dergKlOMOU5PJaBMZYBaqW1DbgJl04CwnZHb9j428tFhDJWzsRJMzQQT3B8yTF1YZEqdcHt0U2d+YBC8xjnJFUvnTepN3WwYYI3I4ojKHAHVYqcXBNEgold8+YX6Z092ErMNJgQGLKf9MjaE8cM5/kOy+ZlKQetWDoQnyttPxETRr4Qi0RjCPXTY/My9NyKqao3iUvmS2/IClYh8oFFiVMRGMMCzZq9G3q84iHf0fGKtjBfEMJI3qqMt0VwMO5m+2cu/MyVgMmSI4jBpFpoedvhh2nNnNv1yWy3ktEFTT6vJwZt0iRaLsclEJjrQOntyhyugu3jzeASMfsqcEi+By0d4kxWZyHpAEnH+16Sj4VbAyxmvKCXt6eFJBwnDrDTTtjBa0VCiXkQFetEhaC7Tot1lqj5daiWnNmsuKAR1NSLdIPnnrztBDmm/w/+jTEvguf52TYN7LeCy6B66OeJ3WhPMrfe+wqRYvPimoilEzWzq63lNhh5RioZCRq7jM3X8QAKW3/P/d2ByuHIh9ARoQtaQaG8gyAWZKTM83YNh8k49FRNhIA29bX69mOasPbbWGciDkE2t1wnSITVrFONL6zck8rcnmXuv+LYNzuuKEUeG/t2JMBFdDc=
+  matrix:
+    - RACKET_VERSION: 6.4
+    - RACKET_VERSION: 6.5
+    - RACKET_VERSION: 6.6
+    - RACKET_VERSION: 6.7
+    - RACKET_VERSION: HEAD
+
+before_install:
+  - git clone https://github.com/greghendershott/travis-racket.git
+  - cat travis-racket/install-racket.sh | bash
+  - export PATH="${RACKET_DIR}/bin:${PATH}"
+
+install:
+  - raco pkg install --installation --auto --link
+      $TRAVIS_BUILD_DIR/aws-cloudformation-template-lib
+      $TRAVIS_BUILD_DIR/aws-cloudformation-template-doc
+  - raco pkg install --installation --auto cover cover-coveralls
+
+script:
+  - raco test -ep aws-cloudformation-template-lib
+  - raco cover -bf coveralls -d $TRAVIS_BUILD_DIR/coverage -p aws-cloudformation-template-lib
+
+after_success:
+  - bash deploy-docs.sh
