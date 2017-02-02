@@ -123,6 +123,15 @@ elements of a list must be the same type.
   ["hello" "world"]
   [{ #:x 0 #:y 0 } { #:x 10 #:y 5 }])}
 
+@deftogether[(@defform[#:kind "type" (Dict type)]
+              @defform[(dict kw elem-expr ... ...)])]{
+The type of dictionaries and dictionary literals, which correspond to arbitrary JSON objects in AWS
+CloudFormation templates.
+
+@(cf-interactions
+  (dict #:x "hello"
+        #:y "world"))}
+
 @deftogether[(@defform[#:kind "type" (Record record-spec ...)
                        #:grammar ([record-spec required-spec
                                    optional-spec]
@@ -226,6 +235,8 @@ Declares a resource to be created by this template with the name @racket[id] and
      [pattern cf:~Resource #:attr elem (reset-srcloc #'Resource)]
      [pattern (cf:~List t:cf-type)
       #:attr elem (reset-srcloc #`(#,(reset-srcloc #'List 1 1) #,(adjust-srclocs #'t.elem 0 6)))]
+     [pattern (cf:~Dict t:cf-type)
+      #:attr elem (reset-srcloc #`(#,(reset-srcloc #'Dict 1 1) #,(adjust-srclocs #'t.elem 0 6)))]
      [pattern (cf:~Record [(kw_req t_req:cf-type) ...] [(kw_opt t_opt:cf-type) ...])
       #:with [(kw_req* t_req*) ...]
              (reverse

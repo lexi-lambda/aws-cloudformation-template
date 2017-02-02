@@ -10,10 +10,10 @@
          racket/stxparam)
 
 (provide (for-syntax lisp-case->upper-camel-case
-                     ~Boolean ~Number ~String ~List ~-> ~Record ~Resource)
+                     ~Boolean ~Number ~String ~List ~-> ~Record ~Dict ~Resource)
          #%top #%top-interaction hash-percent-module-begin hash-percent-app hash-percent-datum
-         Boolean Number String List -> Record Resource
-         ann def defparam defresource fn:if fn:equal?
+         Boolean Number String List -> Record Dict Resource
+         ann dict def defparam defresource fn:if fn:equal?
          (typed-out [aws:region : String]
                     [aws:stack-name : String]
                     [fn:or : (-> Boolean Boolean Boolean)]
@@ -30,6 +30,7 @@
 (define-base-type Resource)
 
 (define-type-constructor List #:arity = 1)
+(define-type-constructor Dict #:arity = 1)
 
 (begin-for-syntax
   (define (sort-kw-pairs kws xs)
@@ -244,6 +245,27 @@
    -------------------------
    [⊢ #,(template (hash- (?@ 'sym e-) ...))
       ⇒ #,(template (Record (?@ kw τ) ...))]])
+
+(define-typed-syntax dict
+  [(_ {~seq kw:keyword e:expr} ...) ⇐ (~Dict τ_elem) ≫
+   #:with ~! #f
+   #:fail-when (check-duplicates (attribute kw) eq? #:key syntax-e)
+               "duplicate dictionary key"
+   [⊢ e ≫ e- ⇐ τ_elem] ...
+   #:with [key-sym ...] (map (compose1 string->symbol keyword->string syntax-e) (attribute kw))
+   -------------------------
+   [⊢ #,(template (hash- {?@ 'key-sym e-} ...))]]
+  [(_ {~seq kw:keyword e:expr} ...) ≫
+   #:with ~! #f
+   #:fail-when (check-duplicates (attribute kw) eq? #:key syntax-e)
+               "duplicate dictionary key"
+   [⊢ e ≫ e- ⇒ τ_elem] ...
+   #:fail-unless (same-types? #'[τ_elem ...])
+                 "all elements of a dictionary must be the same type"
+   #:with τ_elem* (first (attribute τ_elem))
+   #:with [key-sym ...] (map (compose1 string->symbol keyword->string syntax-e) (attribute kw))
+   -------------------------
+   [⊢ #,(template (hash- {?@ 'key-sym e-} ...)) ⇒ (Dict τ_elem*)]])
 
 (define-typed-syntax hash-percent-datum
   [(_ . n:number) ≫
