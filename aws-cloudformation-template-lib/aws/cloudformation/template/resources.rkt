@@ -1,9 +1,10 @@
-#lang turnstile
+#lang curly-fn turnstile
 
 (require (for-syntax syntax/parse/experimental/template
                      threading)
          aws/cloudformation/template/base
-         (only-in racket/contract the-unsupplied-arg))
+         (only-in racket/contract the-unsupplied-arg)
+         racket/function)
 
 (begin-for-syntax
   (define keyword->symbol
@@ -22,18 +23,30 @@
               {~optional {~seq => sym_opt:id}
                          #:defaults ([sym_opt (keyword->symbol #'kw_opt)])}
               τ_opt:type]}
-        ... })
+        ... }
+      {~optional {~seq #:transform transformer}
+                 #:defaults ([transformer #'identity])})
    #:with [arg_req ...] (generate-temporaries (attribute kw_req))
    #:with [arg_opt ...] (generate-temporaries (attribute kw_opt))
    (template
     (begin
       (define (id {?@ kw_req arg_req} ... {?@ kw_opt [arg_opt the-unsupplied-arg]} ...)
         (hash 'Type 'aws-type
-              'Properties (make-immutable-hash
-                           (append (list (cons {?@ 'sym_req arg_req}) ...)
-                                   (filter (λ (pair) (not (eq? the-unsupplied-arg (cdr pair))))
-                                           (list (cons {?@ 'sym_opt arg_opt}) ...))))))
+              'Properties (transformer
+                           (make-immutable-hash
+                            (append (list (cons {?@ 'sym_req arg_req}) ...)
+                                    (filter (λ (pair) (not (eq? the-unsupplied-arg (cdr pair))))
+                                            (list (cons {?@ 'sym_opt arg_opt}) ...)))))))
       (provide (typed-out [id : (-> {?@ kw_req τ_req} ... [kw_opt τ_opt] ... Resource)]))))])
+
+(define (rename-key hsh old-key new-key)
+  (let ([v (hash-ref hsh old-key)])
+    (hash-remove (hash-set hsh new-key v) old-key)))
+
+(define (hash-ref-transform hsh key proc)
+  (if (hash-has-key? hsh key)
+      (hash-update hsh key proc)
+      hsh))
 
 (define-resource-type aws:elastic-load-balancing:load-balancer
   #:aws-type "AWS::ElasticLoadBalancing::LoadBalancer"
@@ -98,6 +111,8 @@
                                           [#:hostname String]
                                           #:image String
                                           [#:links (List String)]
+                                          [#:log-configuration (Record #:log-driver String
+                                                                       [#:options (Dict String)])]
                                           #:memory Number
                                           [#:mount-points (List (Record #:container-path String
                                                                         #:source-volume String
@@ -119,3 +134,35 @@
     [#:task-role-arn String]
     [#:volumes (List (Record #:name String
                              [#:host (Record [#:source-path String])]))] })
+
+(define-resource-type aws:iam:policy
+  #:aws-type "AWS::IAM::Policy"
+  { [#:groups (List String)]
+    #:policy-document (Record #:statement (List (Record #:effect String
+                                                        #:action (List String)
+                                                        #:resource (List String))))
+    #:policy-name String
+    [#:roles (List String)]
+    [#:users (List String)]})
+
+(define-resource-type aws:route53:record-set
+  #:aws-type "AWS::Route53::RecordSet"
+  { [#:alias-target (Record #:dns-name String
+                            [#:evaluate-target-health Boolean]
+                            #:hosted-zone-id String)]
+    [#:comment String]
+    [#:failover String]
+    [#:geo-location String]
+    [#:health-check-id String]
+    [#:hosted-zone-id String]
+    [#:hosted-zone-name String]
+    #:name String
+    [#:region String]
+    [#:resource-records (List String)]
+    [#:set-identifier String]
+    [#:ttl => TTL String]
+    #:type String
+    [#:weight Number] }
+  #:transform (λ (properties)
+                (hash-ref-transform properties 'AliasTarget
+                                    #{rename-key % 'DnsName 'DNSName})))
