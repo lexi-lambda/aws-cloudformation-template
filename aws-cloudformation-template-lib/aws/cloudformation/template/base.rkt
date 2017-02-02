@@ -2,7 +2,8 @@
 
 (module reader syntax/module-reader aws/cloudformation/template/base)
 
-(require (for-syntax syntax/parse/class/paren-shape
+(require (for-syntax syntax/parse/class/local-value
+                     syntax/parse/class/paren-shape
                      syntax/parse/experimental/template
                      threading)
          json
@@ -13,7 +14,7 @@
                      ~Boolean ~Number ~String ~List ~-> ~Record ~Dict ~Resource)
          #%top #%top-interaction hash-percent-module-begin hash-percent-app hash-percent-datum
          Boolean Number String List -> Record Dict Resource
-         ann dict def defparam defresource fn:if fn:equal?
+         ann dict def defparam defresource fn:if fn:equal? fn:get-att
          (typed-out [aws:region : String]
                     [aws:stack-name : String]
                     [fn:or : (-> Boolean Boolean Boolean)]
@@ -330,6 +331,15 @@
          (make-variable-like-transformer
           (⊢ (hash- 'Ref 'str) : τ.norm))))])
 
+(begin-for-syntax
+  (struct resource-binding (name type)
+    #:property prop:procedure
+    (λ (binding stx)
+      ((make-variable-like-transformer
+        (⊢ (hash- 'Ref '#,(resource-binding-name binding))
+           : #,(resource-binding-type binding)))
+       stx))))
+
 (define-simple-macro (defresource id:id e:expr)
   #:with id- (generate-temporary #'id)
   #:with str (lisp-case->upper-camel-case (symbol->string (syntax-e #'id)))
@@ -337,9 +347,7 @@
   (begin
     (define id- (ann e : Resource))
     (hash-set! resources 'sym id-)
-    (define-syntax id
-      (make-variable-like-transformer
-       (⊢ (hash- 'Ref 'str) : Resource)))))
+    (define-syntax id (resource-binding 'str #'Resource))))
 
 ;; ---------------------------------------------------------------------------------------------------
 
@@ -376,3 +384,16 @@
 
 (define (fn:join strs #:separator [separator ""])
   (hash- 'Fn::Join (list- separator strs)))
+
+; TODO: make this better and support resource attributes (see issue #3)
+(define-typed-syntax fn:get-att
+  [(_ {~var resource
+            (local-value resource-binding?
+                         #:failure-message (string-append "identifier was not bound to a resource "
+                                                          "defined in this template"))}
+      att:str) ≫
+   #:with name (resource-binding-name (attribute resource.local-value))
+   -------------------------
+   [⊢ #,(syntax-property #'(hash- 'Fn::GetAtt (list- 'name 'att))
+                         'disappeared-use (syntax-local-introduce #'resource))
+      ⇒ String]])
