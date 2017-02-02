@@ -282,3 +282,23 @@ Declares a resource to be created by this template with the name @racket[id] and
     #'(begin (define-resource-type sym) ...)])
 
 @(define-all-resource-types!)
+
+@section{AWS Intrinsic Functions and Pseudo Parameters}
+
+@defthing[aws:region String]{
+Returns a string representing the AWS Region in which the encompassing resource is being created, such
+as @tt{us-west-2}.}
+
+@defproc[(fn:or [x Boolean] [y Boolean]) Boolean]{
+Returns @racket[#t] if either @racket[x] or @racket[y] evaluate to @racket[#t], otherwise returns
+@racket[#f].}
+
+@defproc[(fn:join [#:separator separator String ""] [strs (List String)]) String]{
+Concatenates a set of strings into a single string, separated by @racket[separator].}
+
+@defproc[(fn:if [condition Boolean] [x a] [y a]) a]{
+Returns @racket[x] if @racket[condition] evaluates to @racket[#t], otherwise returns @racket[y].}
+
+@defproc[(fn:equal? [x a] [y a]) Boolean]{
+Returns @racket[#t] if @racket[x] and @racket[y] are equivalent values, otherwise returns
+@racket[#f].}

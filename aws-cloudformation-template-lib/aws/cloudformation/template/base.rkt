@@ -13,8 +13,9 @@
                      ~Boolean ~Number ~String ~List ~-> ~Record ~Resource)
          #%top #%top-interaction hash-percent-module-begin hash-percent-app hash-percent-datum
          Boolean Number String List -> Record Resource
-         ann def defparam defresource
+         ann def defparam defresource fn:if fn:equal?
          (typed-out [aws:region : String]
+                    [fn:or : (-> Boolean Boolean Boolean)]
                     [fn:join : (-> (List String) [#:separator String] String)]))
 
 (define-syntax-parameter params
@@ -321,6 +322,34 @@
 ;; ---------------------------------------------------------------------------------------------------
 
 (define aws:region (hash- 'Ref "AWS::Region"))
+
+(define-typed-syntax fn:if
+  [(_ e_pred:expr e_true:expr e_false:expr) ≫
+   [⊢ e_pred ≫ e_pred- ⇐ Boolean]
+   [⊢ e_true ≫ e_true- ⇒ τ_true]
+   [⊢ e_false ≫ e_false- ⇒ τ_false]
+   #:fail-unless (type=? #'τ_true #'τ_false)
+                 (string-append "both branches of an if must have the same type; "
+                                "true branch has type ‘" (type->str #'τ_true) "’"
+                                "while false branch has type ‘" (type->str #'τ_false) "’")
+   -------------------------
+   [⊢ (hash- 'Fn::If (list- e_pred- e_true- e_false-)) ⇒ τ_true]])
+
+; TODO: make this variadic
+;   NOTE: Fn::Or apparently only supports up to 10 conditions for some reason
+(define (fn:or a b)
+  (hash- 'Fn::Or (list- a b)))
+
+(define-typed-syntax fn:equal?
+  [(_ a:expr b:expr) ≫
+   [⊢ a ≫ a- ⇒ τ_a]
+   [⊢ b ≫ b- ⇒ τ_b]
+   #:fail-unless (type=? #'τ_a #'τ_b)
+                 (string-append "both arguments must have the same type; "
+                                "first argument has type ‘" (type->str #'τ_a) "’"
+                                "while second argument has type ‘" (type->str #'τ_b) "’")
+   -------------------------
+   [⊢ (hash- 'Fn::If (list- a- b-)) ⇒ Boolean]])
 
 (define (fn:join strs #:separator [separator ""])
   (hash- 'Fn::Join (list- separator strs)))
