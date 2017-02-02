@@ -275,11 +275,10 @@
 
 (define-typed-syntax def
   [(_ id:id {~datum :} τ:type e:expr) ≫
-   [⊢ e ≫ e- ⇐ τ.norm]
    #:with id- (generate-temporary #'id)
    -------------------------
    [≻ (begin
-        (define id- e-)
+        (define id- (ann e : τ))
         (define-syntax id
           (make-variable-like-transformer
            (⊢ id- : τ.norm))))]]
