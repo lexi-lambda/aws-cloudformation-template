@@ -289,6 +289,9 @@ Declares a resource to be created by this template with the name @racket[id] and
 Returns a string representing the AWS Region in which the encompassing resource is being created, such
 as @tt{us-west-2}.}
 
+@defthing[aws:stack-name String]{
+Returns the name of the stack.}
+
 @defproc[(fn:or [x Boolean] [y Boolean]) Boolean]{
 Returns @racket[#t] if either @racket[x] or @racket[y] evaluate to @racket[#t], otherwise returns
 @racket[#f].}

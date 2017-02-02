@@ -15,6 +15,7 @@
          Boolean Number String List -> Record Resource
          ann def defparam defresource fn:if fn:equal?
          (typed-out [aws:region : String]
+                    [aws:stack-name : String]
                     [fn:or : (-> Boolean Boolean Boolean)]
                     [fn:join : (-> (List String) [#:separator String] String)]))
 
@@ -321,6 +322,7 @@
 ;; ---------------------------------------------------------------------------------------------------
 
 (define aws:region (hash- 'Ref "AWS::Region"))
+(define aws:stack-name (hash- 'Ref "AWS::StackName"))
 
 (define-typed-syntax fn:if
   [(_ e_pred:expr e_true:expr e_false:expr) ≫
