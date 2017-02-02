@@ -6,10 +6,9 @@ env:
     - GH_REF: github.com/lexi-lambda/aws-cloudformation-template.git
     - secure: rrFQLyt8ZmwlnhymmP0v6gF/GMhbP4XDhs08mq+AmfId8ONeh3P97dergKlOMOU5PJaBMZYBaqW1DbgJl04CwnZHb9j428tFhDJWzsRJMzQQT3B8yTF1YZEqdcHt0U2d+YBC8xjnJFUvnTepN3WwYYI3I4ojKHAHVYqcXBNEgold8+YX6Z092ErMNJgQGLKf9MjaE8cM5/kOy+ZlKQetWDoQnyttPxETRr4Qi0RjCPXTY/My9NyKqao3iUvmS2/IClYh8oFFiVMRGMMCzZq9G3q84iHf0fGKtjBfEMJI3qqMt0VwMO5m+2cu/MyVgMmSI4jBpFpoedvhh2nNnNv1yWy3ktEFTT6vJwZt0iRaLsclEJjrQOntyhyugu3jzeASMfsqcEi+By0d4kxWZyHpAEnH+16Sj4VbAyxmvKCXt6eFJBwnDrDTTtjBa0VCiXkQFetEhaC7Tot1lqj5daiWnNmsuKAR1NSLdIPnnrztBDmm/w/+jTEvguf52TYN7LeCy6B66OeJ3WhPMrfe+wqRYvPimoilEzWzq63lNhh5RioZCRq7jM3X8QAKW3/P/d2ByuHIh9ARoQtaQaG8gyAWZKTM83YNh8k49FRNhIA29bX69mOasPbbWGciDkE2t1wnSITVrFONL6zck8rcnmXuv+LYNzuuKEUeG/t2JMBFdDc=
   matrix:
-    - RACKET_VERSION: 6.4
-    - RACKET_VERSION: 6.5
     - RACKET_VERSION: 6.6
     - RACKET_VERSION: 6.7
+    - RACKET_VERSION: 6.8
     - RACKET_VERSION: HEAD
 
 before_install:
