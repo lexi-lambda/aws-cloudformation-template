@@ -14,7 +14,7 @@
                      ~Boolean ~Number ~String ~List ~-> ~Record ~Dict ~Resource)
          #%top #%top-interaction hash-percent-module-begin hash-percent-app hash-percent-datum
          Boolean Number String List -> Record Dict Resource
-         ann dict def defparam defresource fn:if fn:equal? fn:get-att
+         ann dict def defparam defresource defoutput defoutputs fn:if fn:equal? fn:get-att
          (typed-out [aws:region : String]
                     [aws:stack-name : String]
                     [fn:or : (-> Boolean Boolean Boolean)]
@@ -23,6 +23,10 @@
 (define-syntax-parameter params
   (λ (stx) (raise-syntax-error #f "cannot use outside of cloudformation template" stx)))
 (define-syntax-parameter resources
+  (λ (stx) (raise-syntax-error #f "cannot use outside of cloudformation template" stx)))
+(define-syntax-parameter outputs
+  (λ (stx) (raise-syntax-error #f "cannot use outside of cloudformation template" stx)))
+(define-syntax-parameter conditions
   (λ (stx) (raise-syntax-error #f "cannot use outside of cloudformation template" stx)))
 
 (define-base-type Boolean)
@@ -235,7 +239,7 @@
    [⊢ e_supplied ≫ e_supplied- ⇐ τ_supplied] ...
    #:with [sym ...] (map (λ~> syntax-e keyword->string
                               lisp-case->upper-camel-case string->symbol)
-                         (attribute kw))
+                         (attribute kw*))
    -------------------------
    [⊢ #,(template (hash- {?@ 'sym e_supplied-} ...))]]
   [(_ {~seq kw:keyword e:expr} ...) ≫
@@ -284,18 +288,28 @@
   --------
   [⊢ e- ⇒ τ.norm])
 
-(define-simple-macro (hash-percent-module-begin body ...)
-  (#%module-begin
-   (define params-hash (make-hash))
-   (define resources-hash (make-hash))
-   (splicing-syntax-parameterize ([params (make-variable-like-transformer #'params-hash)]
-                                  [resources (make-variable-like-transformer #'resources-hash)])
-     body ...)
-   (define template (hash- 'Parameters params-hash
-                           'Resources resources-hash))
-   (provide template)
-   (module+ main
-     (displayln (jsexpr->string template)))))
+(define-syntax-parser hash-percent-module-begin
+  [(_ {~optional {~seq #:description description:str}} body ...)
+   (template
+    (#%module-begin
+     (define params-hash (make-hash))
+     (define conditions-hash (make-hash))
+     (define resources-hash (make-hash))
+     (define outputs-hash (make-hash))
+     (splicing-syntax-parameterize ([params (make-variable-like-transformer #'params-hash)]
+                                    [resources (make-variable-like-transformer #'resources-hash)]
+                                    [conditions (make-variable-like-transformer #'conditions-hash)]
+                                    [outputs (make-variable-like-transformer #'outputs-hash)])
+       body ...)
+     (define template (hash- 'AWSTemplateFormatVersion "2010-09-09"
+                             {?? {?@ 'Description 'description}}
+                             'Parameters params-hash
+                             'Conditions conditions-hash
+                             'Resources resources-hash
+                             'Outputs outputs-hash))
+     (provide template)
+     (module+ main
+       (displayln (jsexpr->string template)))))])
 
 (define-typed-syntax def
   [(_ id:id {~datum :} τ:type e:expr) ≫
@@ -317,19 +331,34 @@
            (⊢ id- : τ))))]])
 
 (define-typed-syntax (defparam id:id {~datum :} τ:type
-                       {~or {~once {~seq #:description e_desc}}}
+                       {~or {~optional {~and #:no-echo {~bind [no-echo? #'#t]}}}
+                            {~optional {~seq #:aws-name aws-name:str}}
+                            {~once {~seq #:description desc:str}}
+                            {~optional {~seq #:default e_default:expr}}
+                            {~optional {~seq #:allowed-values e_allowed:expr}}
+                            {~optional {~seq #:min-length min:nat}}
+                            {~optional {~seq #:max-length max:nat}}
+                            {~optional {~seq #:allowed-pattern pat:str pat-description:str}}}
                        ...) ≫
-  [⊢ e_desc ≫ e_desc- ⇐ String]
-  #:with str (lisp-case->upper-camel-case (symbol->string (syntax-e #'id)))
+  #:with str (or (attribute aws-name)
+                 (lisp-case->upper-camel-case (symbol->string (syntax-e #'id))))
   #:with sym (string->symbol (syntax-e #'str))
   #:with aws-type (type->aws-param-type #'τ)
   -------------------------
-  [≻ (begin
-       (hash-set! params 'sym (hash- 'Type 'aws-type
-                                     'Description e_desc-))
-       (define-syntax id
-         (make-variable-like-transformer
-          (⊢ (hash- 'Ref 'str) : τ.norm))))])
+  [≻ #,(template
+        (begin
+          (hash-set! params 'sym (hash- 'Type 'aws-type
+                                        'Description desc
+                                        {?? {?@ 'NoEcho 'no-echo?}}
+                                        {?? {?@ 'Default (ann e_default : τ)}}
+                                        {?? {?@ 'AllowedValues (ann e_allowed : (List τ))}}
+                                        {?? {?@ 'MinLength 'min}}
+                                        {?? {?@ 'MaxLength 'max}}
+                                        {?? {?@ 'AllowedPattern 'pat
+                                                'ConstraintDescription 'pat-description}}))
+          (define-syntax id
+            (make-variable-like-transformer
+             (⊢ (hash- 'Ref 'str) : τ.norm)))))])
 
 (begin-for-syntax
   (struct resource-binding (name type)
@@ -349,6 +378,13 @@
     (hash-set! resources 'sym id-)
     (define-syntax id (resource-binding 'str #'Resource))))
 
+(define-simple-macro (defoutput id:id e:expr)
+  #:with sym (string->symbol (lisp-case->upper-camel-case (symbol->string (syntax-e #'id))))
+  (hash-set! outputs 'sym (hash- 'Value e)))
+
+(define-simple-macro (defoutputs [id:id e:expr] ...)
+  (begin (defoutput id e) ...))
+
 ;; ---------------------------------------------------------------------------------------------------
 
 (define aws:region (hash- 'Ref "AWS::Region"))
@@ -356,6 +392,8 @@
 
 (define-typed-syntax fn:if
   [(_ e_pred:expr e_true:expr e_false:expr) ≫
+   #:with condition-id (generate-temporary #'e_pred)
+   #:with condition-str (symbol->string (syntax-e #'condition-id))
    [⊢ e_pred ≫ e_pred- ⇐ Boolean]
    [⊢ e_true ≫ e_true- ⇒ τ_true]
    [⊢ e_false ≫ e_false- ⇒ τ_false]
@@ -364,7 +402,10 @@
                                 "true branch has type ‘" (type->str #'τ_true) "’"
                                 "while false branch has type ‘" (type->str #'τ_false) "’")
    -------------------------
-   [⊢ (hash- 'Fn::If (list- e_pred- e_true- e_false-)) ⇒ τ_true]])
+   [⊢ (begin
+        (hash-set! conditions 'condition-id e_pred-)
+        (hash- 'Fn::If (list- 'condition-str e_true- e_false-)))
+      ⇒ τ_true]])
 
 ; TODO: make this variadic
 ;   NOTE: Fn::Or apparently only supports up to 10 conditions for some reason
@@ -380,7 +421,7 @@
                                 "first argument has type ‘" (type->str #'τ_a) "’"
                                 "while second argument has type ‘" (type->str #'τ_b) "’")
    -------------------------
-   [⊢ (hash- 'Fn::If (list- a- b-)) ⇒ Boolean]])
+   [⊢ (hash- 'Fn::Equals (list- a- b-)) ⇒ Boolean]])
 
 (define (fn:join strs #:separator [separator ""])
   (hash- 'Fn::Join (list- separator strs)))
