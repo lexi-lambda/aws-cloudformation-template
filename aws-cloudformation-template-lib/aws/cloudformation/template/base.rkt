@@ -52,11 +52,10 @@
                "duplicate keyword argument"
    #:with [(kw* . τ_kw*) ...] (sort-kw-pairs (attribute kw) (attribute τ_kw.norm))
    #:with [(kw_opt* . τ_opt*) ...] (sort-kw-pairs (attribute kw_opt) (attribute τ_opt.norm))
-   (⊢ (->-internal [list- τ_pos.norm ...]
-                   [list- (cons- 'kw* τ_kw*) ...]
-                   [list- (cons- 'kw_opt* τ_opt*) ...]
-                   τ_result.norm)
-      : #%type)])
+   (mk-type #'(->-internal [list- τ_pos.norm ...]
+                           [list- (cons- 'kw* τ_kw*) ...]
+                           [list- (cons- 'kw_opt* τ_opt*) ...]
+                           τ_result.norm))])
 (begin-for-syntax
   (define-syntax ~->
     (pattern-expander
@@ -81,9 +80,8 @@
                "duplicate record key"
    #:with [(kw* . τ*) ...] (sort-kw-pairs (attribute kw) (attribute τ.norm))
    #:with [(kw_opt* . τ_opt*) ...] (sort-kw-pairs (attribute kw_opt) (attribute τ_opt.norm))
-   (⊢ (Record-internal (list- (cons- 'kw* τ*) ...)
-                       (list- (cons- 'kw_opt* τ_opt*) ...))
-      : #%type)])
+   (mk-type #'(Record-internal (list- (cons- 'kw* τ*) ...)
+                               (list- (cons- 'kw_opt* τ_opt*) ...)))])
 (begin-for-syntax
   (define-syntax ~Record
     (pattern-expander
